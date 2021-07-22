@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import Scrollbar, filedialog
 from tkinter.constants import BOTTOM, HORIZONTAL, NW, RIGHT, VERTICAL, X, Y
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageDraw
 import video_tools
 import cv2
 from rectangle_name_generator import rectangle_name
@@ -79,6 +79,11 @@ class LumaAnalyzer(tk.Frame):
         self.delete_region_of_interest_button["text"] = "Delete ROI"
         self.delete_region_of_interest_button["command"] = self.delete_region_of_interest
         self.delete_region_of_interest_button.grid(row=1, column=5)
+
+        self.begin_analysis_button = tk.Button(self)
+        self.begin_analysis_button["text"] = "Begin Analysis"
+        self.begin_analysis_button["command"] = self.analyze_luma
+        self.begin_analysis_button.grid(row=1, column=6)
         
 
         self.region_of_interest_x_label = tk.Label(self, text="ROI Length:")
@@ -103,6 +108,29 @@ class LumaAnalyzer(tk.Frame):
         self.video_display_frame.delete(self.regions_of_interest.get(roi_key))
         self.regions_of_interest.pop(roi_key, None)
 
+    def analyze_luma(self):
+        self.draw_rectangle.set(False)
+        player = video_tools.VideoPlayer(self.video_file_name.get())
+        cv2image = player.grab_next_frame()
+        img = Image.fromarray(cv2image)
+
+        for _, rectangle in self.regions_of_interest.items():
+            x1, y1, x2, y2 = self.video_display_frame.coords(rectangle)
+
+            draw = ImageDraw.Draw(img)
+            draw.rectangle([x1, y1, x2, y2], outline="black")
+            img.save("test_image.png", "png")
+
+
+        # while cv2image is not None:
+        #     img = Image.fromarray(cv2image)
+        #     imgtk = ImageTk.PhotoImage(image=img)
+        #     self.video_display_frame.imgtk = imgtk
+        #     self.video_display_frame.itemconfig(self.image_on_video_display, image = imgtk)
+        #     cv2image = player.grab_next_frame()
+        player.close_video()
+
+
     def get_mouse_coordinates(self, event):
         canvas_coords = event.widget
         c_x = canvas_coords.canvasx(event.x)
@@ -125,26 +153,13 @@ class LumaAnalyzer(tk.Frame):
         self.draw_rectangle.set(not self.draw_rectangle.get())
 
     def display_first_frame(self):
-        
-        #cap = cv2.VideoCapture(self.video_file_name.get())
-        #_, frame = cap.read()
-        #cv2image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
-
         cv2image = video_tools.grab_first_frame(self.video_file_name.get())
         img = Image.fromarray(cv2image)
         imgtk = ImageTk.PhotoImage(image=img)
         self.video_display_frame.imgtk = imgtk
-        self.video_display_frame.create_image(0, 0, anchor = NW, image=imgtk)
+        self.image_on_video_display = self.video_display_frame.create_image(0, 0, anchor = NW, image=imgtk)
         self.video_display_frame.config(scrollregion=self.video_display_frame.bbox(tk.ALL))
 
-
-
-        #frame = video_tools.grab_first_frame(self.video_file_name.get())
-        #image = Image.fromarray(frame)
-        #imagetk = ImageTk.PhotoImage(image=image)
-        #print("displaying image")
-        #self.video_display_frame.configure(image=imagetk, textvariable="Hello")
-        #print("image displayed")
 
 
 root = tk.Tk()
