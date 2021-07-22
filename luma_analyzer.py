@@ -75,6 +75,12 @@ class LumaAnalyzer(tk.Frame):
         self.regions_of_interest_combobox["postcommand"] = lambda: self.regions_of_interest_combobox.configure(values=list(self.regions_of_interest.keys()))
         self.regions_of_interest_combobox.grid(row=1, column=4)
 
+        self.delete_region_of_interest_button = tk.Button(self)
+        self.delete_region_of_interest_button["text"] = "Delete ROI"
+        self.delete_region_of_interest_button["command"] = self.delete_region_of_interest
+        self.delete_region_of_interest_button.grid(row=1, column=5)
+        
+
         self.region_of_interest_x_label = tk.Label(self, text="ROI Length:")
         self.region_of_interest_x_label.grid(row=2, column=0)
         self.region_of_interest_x_entry = tk.Entry(self, textvariable=self.region_of_interest_x)
@@ -92,16 +98,19 @@ class LumaAnalyzer(tk.Frame):
         file_path = filedialog.askopenfilename()
         self.video_file_name.set(file_path)
 
+    def delete_region_of_interest(self):
+        roi_key = self.regions_of_interest_combobox.get()
+        self.video_display_frame.delete(self.regions_of_interest.get(roi_key))
+        self.regions_of_interest.pop(roi_key, None)
+
     def get_mouse_coordinates(self, event):
-        print("Clicked {} {}".format(event.x, event.y))
         canvas_coords = event.widget
         c_x = canvas_coords.canvasx(event.x)
         c_y = canvas_coords.canvasy(event.y)
-        print(c_x, c_y)
 
         if self.draw_rectangle.get():
             region = self.video_display_frame.create_rectangle(c_x, c_y, c_x + int(self.region_of_interest_x.get()), c_y + int(self.region_of_interest_y.get()))
-            self.regions_of_interest[next(self.gen_rectangle_name)] = region
+            self.regions_of_interest[str(next(self.gen_rectangle_name))] = region
 
     def open_video_active(self, *args):
         filename = self.video_file_name.get()
