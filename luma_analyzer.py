@@ -8,6 +8,7 @@ import video_tools
 import cv2
 from rectangle_name_generator import rectangle_name
 from multiprocessing import Process
+import csv
 
 
 class VideoFrame(tk.Frame):
@@ -26,13 +27,19 @@ class DataPoint:
 def write_datapoints_to_file(filename, datapoints):
     metrics = 0
 
-    for datapoint in datapoints:
-        metrics += len(datapoint.datapoints)
+    # for datapoint in datapoints:
+    #     metrics += len(datapoint.datapoints)
+    #     print(datapoint.datapoints)
 
-    with open("{}.csv".format(filename), "w") as csvfile:
-        csvfile.write("results\n")
-        csvfile.write(str(len(datapoints)) + "\n")
-        csvfile.write(str(metrics))
+    with open("{}.csv".format(filename), "w", newline='', encoding="utf-8") as csvfile:
+        field_names = ["frame", "ROI", "Luma"]
+        writer = csv.DictWriter(csvfile, fieldnames=field_names)
+        writer.writeheader()
+        
+        for datapoint in datapoints:
+            for roi, metric in datapoint.datapoints.items():
+                writer.writerow({"frame": datapoint.frame, "ROI": roi, "Luma": metric})
+
 
 def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates):
         player = video_tools.VideoPlayer(video_file_name)
@@ -62,8 +69,24 @@ def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates):
             datapoint = DataPoint(int(frame_number))
 
             for name, rectangle in regions_of_interest.items():
-                # pretend we're processing some data
-                datapoint.add_datapoint(name, 0)
+                x1, y1, x2, y2 = rectangle_coordinates[name]
+
+                #print(x1, y1, x2, y2)
+
+                luma_values = 0
+                for x in range(int(x1), int(x2)):
+                    for y in range(int(y1), int(y2)):
+                        value = img.getpixel((x, y))
+                        r = value[0]
+                        g = value[1]
+                        b = value[2]
+
+                        # See Y' 601. https://en.wikipedia.org/wiki/Luma_(video)
+                        luma_value = 0.299 * r + 0.587 * g + 0.114 * b
+                        luma_values += luma_value
+
+
+                datapoint.add_datapoint(name, luma_values)
             
             datapoints.append(datapoint)
 
