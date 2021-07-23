@@ -1,3 +1,4 @@
+from os import name
 import tkinter as tk
 from tkinter import ttk
 from tkinter import Scrollbar, filedialog
@@ -6,12 +7,71 @@ from PIL import Image, ImageTk, ImageDraw
 import video_tools
 import cv2
 from rectangle_name_generator import rectangle_name
+from multiprocessing import Process
+
 
 class VideoFrame(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
         self.pack()
 
+class DataPoint:
+    def __init__(self, frame):
+        self.frame = frame
+        self.datapoints = {}
+
+    def add_datapoint(self, name, metric):
+        self.datapoints[name] = metric
+
+def write_datapoints_to_file(filename, datapoints):
+    metrics = 0
+
+    for datapoint in datapoints:
+        metrics += len(datapoint.datapoints)
+
+    with open("{}.csv".format(filename), "w") as csvfile:
+        csvfile.write("results\n")
+        csvfile.write(str(len(datapoints)) + "\n")
+        csvfile.write(str(metrics))
+
+def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates):
+        player = video_tools.VideoPlayer(video_file_name)
+
+        datapoints = []
+
+        cv2image = player.grab_next_frame()
+        
+        if cv2image is None:
+            return
+
+        img = Image.fromarray(cv2image)
+
+        filename = video_file_name.split("/")[-1].split(".")[0]
+
+        for name, _ in regions_of_interest.items():
+            x1, y1, x2, y2 = rectangle_coordinates[name]
+
+            draw = ImageDraw.Draw(img)
+            draw.rectangle([x1, y1, x2, y2], outline="black")
+
+        img.save("{}.png".format(filename), "png")
+
+        while cv2image is not None:
+            img = Image.fromarray(cv2image)
+            frame_number = player.get_frame_number()
+            datapoint = DataPoint(int(frame_number))
+
+            for name, rectangle in regions_of_interest.items():
+                # pretend we're processing some data
+                datapoint.add_datapoint(name, 0)
+            
+            datapoints.append(datapoint)
+
+            cv2image = player.grab_next_frame()
+
+        write_datapoints_to_file(filename, datapoints)
+
+        player.close_video()
 
 class LumaAnalyzer(tk.Frame):
     def __init__(self, master=None):
@@ -110,16 +170,25 @@ class LumaAnalyzer(tk.Frame):
 
     def analyze_luma(self):
         self.draw_rectangle.set(False)
-        player = video_tools.VideoPlayer(self.video_file_name.get())
-        cv2image = player.grab_next_frame()
-        img = Image.fromarray(cv2image)
 
-        for _, rectangle in self.regions_of_interest.items():
+        rectangle_coordinates = {}
+        for name, rectangle in self.regions_of_interest.items():
             x1, y1, x2, y2 = self.video_display_frame.coords(rectangle)
+            rectangle_coordinates[name] = [x1, y1, x2, y2]
 
-            draw = ImageDraw.Draw(img)
-            draw.rectangle([x1, y1, x2, y2], outline="black")
-            img.save("test_image.png", "png")
+        analyzer = Process(target=analyze_video, args=(self.video_file_name.get(), self.regions_of_interest, rectangle_coordinates))
+        analyzer.start()
+
+        # player = video_tools.VideoPlayer(self.video_file_name.get())
+        # cv2image = player.grab_next_frame()
+        # img = Image.fromarray(cv2image)
+
+        # for _, rectangle in self.regions_of_interest.items():
+        #     x1, y1, x2, y2 = self.video_display_frame.coords(rectangle)
+
+        #     draw = ImageDraw.Draw(img)
+        #     draw.rectangle([x1, y1, x2, y2], outline="black")
+        #     img.save("test_image.png", "png")
 
 
         # while cv2image is not None:
@@ -128,7 +197,7 @@ class LumaAnalyzer(tk.Frame):
         #     self.video_display_frame.imgtk = imgtk
         #     self.video_display_frame.itemconfig(self.image_on_video_display, image = imgtk)
         #     cv2image = player.grab_next_frame()
-        player.close_video()
+        # player.close_video()
 
 
     def get_mouse_coordinates(self, event):
@@ -161,7 +230,7 @@ class LumaAnalyzer(tk.Frame):
         self.video_display_frame.config(scrollregion=self.video_display_frame.bbox(tk.ALL))
 
 
-
-root = tk.Tk()
-app = LumaAnalyzer(master=root)
-app.mainloop()
+if "__main__" == __name__:
+    root = tk.Tk()
+    app = LumaAnalyzer(master=root)
+    app.mainloop()

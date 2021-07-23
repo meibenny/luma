@@ -21,3 +21,6 @@ class VideoPlayer:
 
     def close_video(self):
         self.cap.release()
+
+    def get_frame_number(self):
+        return self.cap.get(cv2.CAP_PROP_POS_FRAMES)
