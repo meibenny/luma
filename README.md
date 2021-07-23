@@ -7,3 +7,8 @@
 ```
 pip install -r requirements.txt
 ```
+
+## Generate Executable
+```
+pyinstaller.exe luma_analyzer.py --onefile
+```
