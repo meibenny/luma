@@ -7,7 +7,7 @@ from PIL import Image, ImageTk, ImageDraw
 import video_tools
 import cv2
 from rectangle_name_generator import rectangle_name
-from multiprocessing import Process
+from multiprocessing import Process, freeze_support
 import csv
 
 
@@ -254,6 +254,7 @@ class LumaAnalyzer(tk.Frame):
 
 
 if "__main__" == __name__:
+    freeze_support()
     root = tk.Tk()
     app = LumaAnalyzer(master=root)
     app.mainloop()
