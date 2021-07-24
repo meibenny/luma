@@ -24,7 +24,7 @@ class DataPoint:
     def add_datapoint(self, name, metric):
         self.datapoints[name] = metric
 
-def write_datapoints_to_file(filename, datapoints):
+def write_datapoints_to_file(filename, datapoints, regions_of_interest):
     metrics = 0
 
     # for datapoint in datapoints:
@@ -32,13 +32,18 @@ def write_datapoints_to_file(filename, datapoints):
     #     print(datapoint.datapoints)
 
     with open("{}.csv".format(filename), "w", newline='', encoding="utf-8") as csvfile:
-        field_names = ["frame", "ROI", "Luma"]
+        field_names = ["frame"]
+        roi_names = ["ROI " + name for name, _ in regions_of_interest.items()]
+        field_names.extend(roi_names)
         writer = csv.DictWriter(csvfile, fieldnames=field_names)
         writer.writeheader()
         
         for datapoint in datapoints:
+            row_data = {"frame": datapoint.frame}
             for roi, metric in datapoint.datapoints.items():
-                writer.writerow({"frame": datapoint.frame, "ROI": roi, "Luma": metric})
+                #writer.writerow({"frame": datapoint.frame, "ROI": roi, "Luma": metric})
+                row_data["ROI " + roi] = metric
+            writer.writerow(row_data)
 
 
 def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates):
@@ -92,7 +97,7 @@ def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates):
 
             cv2image = player.grab_next_frame()
 
-        write_datapoints_to_file(filename, datapoints)
+        write_datapoints_to_file(filename, datapoints, regions_of_interest)
 
         player.close_video()
 
