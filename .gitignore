@@ -6,4 +6,3 @@ venv/
 *.csv
 build/
 dist/
-*.spec
