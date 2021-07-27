@@ -32,8 +32,11 @@ def update_progressbar(progress_bar, q):
             value = q.get()
             if value == "kill program":
                 break
-            print(value)
             progress_bar["value"] = value
+
+def update_analyze_button(analysis_process, button):
+    analysis_process.join()
+    button["state"] = "normal"
 
 def write_datapoints_to_file(filename, datapoints, regions_of_interest):
     metrics = 0
@@ -230,6 +233,7 @@ class LumaAnalyzer(tk.Frame):
 
     def analyze_luma(self):
         self.draw_rectangle.set(False)
+        self.begin_analysis_button["state"] = "disabled"
 
         rectangle_coordinates = {}
         for name, rectangle in self.regions_of_interest.items():
@@ -238,6 +242,9 @@ class LumaAnalyzer(tk.Frame):
 
         analyzer = Process(target=analyze_video, args=(self.video_file_name.get(), self.regions_of_interest, rectangle_coordinates, self.progress_bar_q))
         analyzer.start()
+        begin_analysis_button_update_thread = Thread(target=update_analyze_button, args=(analyzer, self.begin_analysis_button))
+        begin_analysis_button_update_thread.start()
+
 
         # player = video_tools.VideoPlayer(self.video_file_name.get())
         # cv2image = player.grab_next_frame()
