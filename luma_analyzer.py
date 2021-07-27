@@ -7,8 +7,10 @@ from PIL import Image, ImageTk, ImageDraw
 import video_tools
 import cv2
 from rectangle_name_generator import rectangle_name
-from multiprocessing import Process, freeze_support
+from multiprocessing import Process, freeze_support, SimpleQueue
 import csv
+from datetime import datetime
+from threading import Thread
 
 
 class VideoFrame(tk.Frame):
@@ -23,6 +25,15 @@ class DataPoint:
 
     def add_datapoint(self, name, metric):
         self.datapoints[name] = metric
+
+def update_progressbar(progress_bar, q):
+    while(True):
+        if not q.empty():
+            value = q.get()
+            if value == "kill program":
+                break
+            print(value)
+            progress_bar["value"] = value
 
 def write_datapoints_to_file(filename, datapoints, regions_of_interest):
     metrics = 0
@@ -46,8 +57,20 @@ def write_datapoints_to_file(filename, datapoints, regions_of_interest):
             writer.writerow(row_data)
 
 
-def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates):
+def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates, progress_bar_q):
         player = video_tools.VideoPlayer(video_file_name)
+
+        progress_bar_q.put(1)
+        current_datetime = datetime.now()
+        file_postfix = "{}.{}.{}-{}.{}.{}.{}".format(
+            current_datetime.year,
+            current_datetime.month,
+            current_datetime.day,
+            current_datetime.hour,
+            current_datetime.minute,
+            current_datetime.second,
+            current_datetime.microsecond
+        )
 
         datapoints = []
 
@@ -59,6 +82,7 @@ def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates):
         img = Image.fromarray(cv2image)
 
         filename = video_file_name.split("/")[-1].split(".")[0]
+        filename = filename + "." + file_postfix
 
         for name, _ in regions_of_interest.items():
             x1, y1, x2, y2 = rectangle_coordinates[name]
@@ -95,6 +119,8 @@ def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates):
             
             datapoints.append(datapoint)
 
+            progress_bar_q.put(player.get_processed_frames_as_percent())
+
             cv2image = player.grab_next_frame()
 
         write_datapoints_to_file(filename, datapoints, regions_of_interest)
@@ -102,7 +128,7 @@ def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates):
         player.close_video()
 
 class LumaAnalyzer(tk.Frame):
-    def __init__(self, master=None):
+    def __init__(self, progress_bar_q, master=None):
         super().__init__(master)
 
         self.gen_rectangle_name = rectangle_name()
@@ -114,6 +140,7 @@ class LumaAnalyzer(tk.Frame):
         self.regions_of_interest = {}
         self.region_of_interest_x = tk.StringVar(self.master, value="25")
         self.region_of_interest_y = tk.StringVar(self.master, value="50")
+        self.progress_bar_q = progress_bar_q
         self.create_widgets()
 
 
@@ -184,6 +211,11 @@ class LumaAnalyzer(tk.Frame):
         self.region_of_interest_x_entry = tk.Entry(self, textvariable=self.region_of_interest_y)
         self.region_of_interest_x_entry.grid(row=2, column=3)
 
+        self.progress_bar = ttk.Progressbar(self, orient=tk.HORIZONTAL, length = 100, mode = 'determinate')
+        self.progress_bar["value"] = 0
+        self.progress_bar.grid(row=2, column=4)
+
+
     def say_hi(self):
         print("hi there, everyone!")
 
@@ -204,7 +236,7 @@ class LumaAnalyzer(tk.Frame):
             x1, y1, x2, y2 = self.video_display_frame.coords(rectangle)
             rectangle_coordinates[name] = [x1, y1, x2, y2]
 
-        analyzer = Process(target=analyze_video, args=(self.video_file_name.get(), self.regions_of_interest, rectangle_coordinates))
+        analyzer = Process(target=analyze_video, args=(self.video_file_name.get(), self.regions_of_interest, rectangle_coordinates, self.progress_bar_q))
         analyzer.start()
 
         # player = video_tools.VideoPlayer(self.video_file_name.get())
@@ -261,5 +293,10 @@ class LumaAnalyzer(tk.Frame):
 if "__main__" == __name__:
     freeze_support()
     root = tk.Tk()
-    app = LumaAnalyzer(master=root)
+    progress_bar_q = SimpleQueue()
+    app = LumaAnalyzer(progress_bar_q, master=root)
+    progress_bar_update_thread = Thread(target=update_progressbar, args=(app.progress_bar, progress_bar_q))
+    progress_bar_update_thread.start()
     app.mainloop()
+    progress_bar_q.put("kill program")
+    progress_bar_update_thread.join()

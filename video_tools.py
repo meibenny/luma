@@ -24,3 +24,11 @@ class VideoPlayer:
 
     def get_frame_number(self):
         return self.cap.get(cv2.CAP_PROP_POS_FRAMES)
+
+    def get_total_frames(self):
+        return self.cap.get(cv2.CAP_PROP_FRAME_COUNT)
+
+    def get_processed_frames_as_percent(self):
+        frames_processed = self.get_frame_number()
+        total_frames = self.get_total_frames()
+        return int(100* (frames_processed / total_frames) )
