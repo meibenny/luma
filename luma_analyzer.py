@@ -11,6 +11,7 @@ from multiprocessing import Process, freeze_support, SimpleQueue
 import csv
 from datetime import datetime
 from threading import Thread
+from pathlib import Path
 
 
 class VideoFrame(tk.Frame):
@@ -84,8 +85,12 @@ def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates, p
 
         img = Image.fromarray(cv2image)
 
-        filename = video_file_name.split("/")[-1].split(".")[0]
-        filename = filename + "." + file_postfix
+        video_file_path = Path(video_file_name)
+        video_file_parent = video_file_path.parent.absolute()
+
+        output_filename = video_file_name.split("/")[-1].split(".")[0]
+        output_filename = output_filename + "." + file_postfix
+        output_filename = Path(video_file_parent, output_filename)
 
         for name, _ in regions_of_interest.items():
             x1, y1, x2, y2 = rectangle_coordinates[name]
@@ -93,7 +98,7 @@ def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates, p
             draw = ImageDraw.Draw(img)
             draw.rectangle([x1, y1, x2, y2], outline="black")
 
-        img.save("{}.png".format(filename), "png")
+        img.save("{}.png".format(output_filename), "png")
 
         while cv2image is not None:
             img = Image.fromarray(cv2image)
@@ -126,7 +131,7 @@ def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates, p
 
             cv2image = player.grab_next_frame()
 
-        write_datapoints_to_file(filename, datapoints, regions_of_interest)
+        write_datapoints_to_file(output_filename, datapoints, regions_of_interest)
 
         player.close_video()
 
