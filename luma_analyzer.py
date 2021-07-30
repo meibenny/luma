@@ -1,9 +1,10 @@
+from os import name
 import tkinter as tk
 from tkinter import ttk
 from tkinter import Scrollbar, filedialog
 from tkinter.constants import BOTTOM, HORIZONTAL, NW, RIGHT, VERTICAL, X, Y
 from PIL import Image, ImageTk
-import VideoTools
+import video_tools
 from rectangle_name_generator import rectangle_name
 from multiprocessing import Process, freeze_support, SimpleQueue
 from threading import Thread
@@ -164,7 +165,7 @@ class LumaAnalyzer(tk.Frame):
         self.draw_rectangle.set(not self.draw_rectangle.get())
 
     def display_first_frame(self):
-        cv2image = VideoTools.grab_first_frame(self.video_file_name.get())
+        cv2image = video_tools.grab_first_frame(self.video_file_name.get())
         img = Image.fromarray(cv2image)
         imgtk = ImageTk.PhotoImage(image=img)
         self.video_display_frame.imgtk = imgtk
