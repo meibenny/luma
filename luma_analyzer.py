@@ -10,7 +10,6 @@ from multiprocessing import Process, freeze_support, SimpleQueue
 from threading import Thread
 from process_video import analyze_video
 
-
 class VideoFrame(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
