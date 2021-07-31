@@ -5,38 +5,8 @@ from PIL import Image, ImageDraw
 from pathlib import Path
 import csv
 from DataPoint import DataPoint
-from time import sleep
-from VideoFrame import VideoFrame
-from threading import Thread
 
-
-
-def load_video_frames(video_buffer: list, video_file_name: str):
-    player = video_tools.VideoPlayer(video_file_name)
-
-    cv2image = player.grab_next_frame()
-
-    while cv2image is not None:
-        while len(video_buffer) >= 100:
-            sleep(2)
-
-        img = Image.fromarray(cv2image)
-        frame_number = player.get_frame_number()
-        processed_percent = player.get_processed_frames_as_percent()
-
-        video_frame = VideoFrame(img, frame_number, processed_percent)
-        video_buffer.append(video_frame)
-        cv2image = player.grab_next_frame()
-
-
-    player.close_video()
-    video_frame = VideoFrame(img, -1, 100)
-    video_buffer.append(video_frame)
-
-    
-
-    
-def process_points(regions_of_interest: dict, rectangle_coordinates:dict, img: Image, datapoint: DataPoint):
+def process_points(regions_of_interest, rectangle_coordinates, img, datapoint):
 
     for name, rectangle in regions_of_interest.items():
         x1, y1, x2, y2 = rectangle_coordinates[name]
@@ -78,11 +48,9 @@ def write_datapoints_to_file(filename, datapoints, regions_of_interest):
             writer.writerow(row_data)
 
 def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates, progress_bar_q):
-        # pr = cProfile.Profile()
-        # pr.enable()
-        # player = video_tools.VideoPlayer(video_file_name)
-
-        starttime = datetime.now()
+        pr = cProfile.Profile()
+        pr.enable()
+        player = video_tools.VideoPlayer(video_file_name)
 
         progress_bar_q.put(1)
         current_datetime = datetime.now()
@@ -98,9 +66,12 @@ def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates, p
 
         datapoints = []
 
-        video_frames = []
-        load_frames_thread = Thread(target=load_video_frames, args=(video_frames, video_file_name))
-        load_frames_thread.start()
+        cv2image = player.grab_next_frame()
+        
+        if cv2image is None:
+            return
+
+        img = Image.fromarray(cv2image)
 
         video_file_path = Path(video_file_name)
         video_file_parent = video_file_path.parent.absolute()
@@ -109,40 +80,49 @@ def analyze_video(video_file_name, regions_of_interest, rectangle_coordinates, p
         output_filename = output_filename + "." + file_postfix
         output_filename = Path(video_file_parent, output_filename)
 
-        while not len(video_frames):
-            sleep(2)
-
-        img = video_frames.pop(0)
-
         for name, _ in regions_of_interest.items():
             x1, y1, x2, y2 = rectangle_coordinates[name]
 
-            draw = ImageDraw.Draw(img.image)
+            draw = ImageDraw.Draw(img)
             draw.rectangle([x1, y1, x2, y2], outline="black")
 
-        img.image.save("{}.png".format(output_filename), "png")
+        img.save("{}.png".format(output_filename), "png")
 
-        while img.frame_number != -1:
+        while cv2image is not None:
+            img = Image.fromarray(cv2image)
+            frame_number = player.get_frame_number()
+            datapoint = DataPoint(int(frame_number))
+
+            process_points(regions_of_interest, rectangle_coordinates, img, datapoint)
+
+            # for name, rectangle in regions_of_interest.items():
+            #     x1, y1, x2, y2 = rectangle_coordinates[name]
+
+            #     #print(x1, y1, x2, y2)
+
+            #     luma_values = 0
+            #     for x in range(int(x1), int(x2)):
+            #         for y in range(int(y1), int(y2)):
+            #             value = img.getpixel((x, y))
+            #             r = value[0]
+            #             g = value[1]
+            #             b = value[2]
+
+            #             # See Y' 601. https://en.wikipedia.org/wiki/Luma_(video)
+            #             luma_value = 0.299 * r + 0.587 * g + 0.114 * b
+            #             luma_values += luma_value
+
+
+            #     datapoint.add_datapoint(name, luma_values)
             
-            datapoint = DataPoint(int(img.frame_number))
-
-            process_points(regions_of_interest, rectangle_coordinates, img.image, datapoint)
-
             datapoints.append(datapoint)
 
-            progress_bar_q.put(img.processed_percent)
+            progress_bar_q.put(player.get_processed_frames_as_percent())
 
-            while not len(video_frames):
-                sleep(2)
-
-            img = video_frames.pop(0)
+            cv2image = player.grab_next_frame()
 
         write_datapoints_to_file(output_filename, datapoints, regions_of_interest)
-        endtime = datetime.now()
-        elapsed = endtime - starttime
-        print("Elapsed")
-        print(elapsed)
 
-        # player.close_video()
-        # pr.disable()
-        # pr.print_stats(sort='tottime')
+        player.close_video()
+        pr.disable()
+        pr.print_stats(sort='tottime')
